@@ -49,60 +49,43 @@ def removeWall(image):
     contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
     x, y, w, h = cv2.boundingRect(contours[0])
-    rect = cv2.rectangle(thresh, (x, y), (x + w, y + h), (0, 255, 0), 2)        
+    rect = cv2.rectangle(thresh, (x, y), (x + w, y + h), (255, 255, 255), 2)        
     cropped = thresh[y:y + h, x:x + w] 
-
-    '''cv2.imshow('original', thresh)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    cv2.imshow('cropped', cropped)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()'''
     return cropped
 
-
+# Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def main():
     # currently work for title: noback2, salenoback 
-    image = cv2.imread('images/blank.jpg')
-    ### Preprocessing Image ###
-    # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU | 
-                                            cv2.THRESH_BINARY_INV)
-    #thresh = cv2.bitwise_not(thresh) ## new
+    image = cv2.imread('images/templatesale4.jpg')
+    croppedImage = removeWall(image)
+    inverse = cv2.bitwise_not(croppedImage)
     ksize = 50
     rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (ksize, ksize))
-    dilation = cv2.dilate(thresh, rect_kernel, iterations = 1)    
+    dilation = cv2.dilate(inverse, rect_kernel, iterations = 1)    
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
-
-    im2 = image.copy()
-    
-    # Remove dark wall from image
-    '''x, y, w, h = cv2.boundingRect(contours[0])
-    rect = cv2.rectangle(thresh, (x, y), (x + w, y + h), (0, 255, 0), 2)        
-    cropped = thresh[y:y + h, x:x + w] 
-    cv2.imshow('img', thresh)
-    cv2.waitKey(0)'''
 
     file = open("recognized.txt", "w+")
     file.write("")
     file.close()
-
     possible_titles = {}
     j = 0
-    print(len(contours))
+
+    im2 = image.copy()   
+    print(len(contours)) 
     for cnt in contours:
         # Source: https://stackoverflow.com/questions/24385714/detect-text-region-in-image-using-opencv 
         x, y, w, h = cv2.boundingRect(cnt)
-        rect = cv2.rectangle(im2, (x, y), (x + w, y + h), (0, 255, 0), 2)        
-        cropped = thresh[y:y + h, x:x + w] # was im2
+        cropped = inverse[y:y + h, x:x + w] # was thresh # was im2
         file = open("recognized.txt", "a")
         text = pytesseract.image_to_string(cropped)
 
+        '''cv2.imshow('image', cropped)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()'''
 
         # Get title    
-        #possible_titles[j] = get_sentence_info(cropped) 
+        possible_titles[j] = get_sentence_info(cropped) 
         j += 1
 
         '''newtext = ""
@@ -124,5 +107,6 @@ def main():
     max_val = max(possible_titles.values(), key=lambda sub: sub[0])[1]
     new_title = clean_title(max_val)
     print(new_title)    
+
 
 main()
