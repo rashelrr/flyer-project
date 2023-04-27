@@ -41,9 +41,29 @@ def get_sentence_info(cropped):
     return (avg_word_height, sentence)
 
 
-def main():
-    image = cv2.imread('images/noback2.jpg')
+def removeWall(image):
+    # assumes dark wall
+    # works for: templateshapes, templatesale and 2, template_3_bad!!!, withbackground...
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    ret, thresh = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
+    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+                                             cv2.CHAIN_APPROX_NONE)
+    x, y, w, h = cv2.boundingRect(contours[0])
+    rect = cv2.rectangle(thresh, (x, y), (x + w, y + h), (0, 255, 0), 2)        
+    cropped = thresh[y:y + h, x:x + w] 
 
+    '''cv2.imshow('original', thresh)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cv2.imshow('cropped', cropped)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()'''
+    return cropped
+
+
+def main():
+    # currently work for title: noback2, salenoback 
+    image = cv2.imread('images/blank.jpg')
     ### Preprocessing Image ###
     # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -79,11 +99,10 @@ def main():
         cropped = thresh[y:y + h, x:x + w] # was im2
         file = open("recognized.txt", "a")
         text = pytesseract.image_to_string(cropped)
-        #cv2.imshow('img', cropped)
-        #cv2.waitKey(0)
+
 
         # Get title    
-        possible_titles[j] = get_sentence_info(cropped) 
+        #possible_titles[j] = get_sentence_info(cropped) 
         j += 1
 
         '''newtext = ""
