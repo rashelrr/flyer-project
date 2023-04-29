@@ -8,6 +8,7 @@ import math
 import pytesseract
 from pytesseract import Output
 import re
+from datetime import datetime
 
 
 def clean_title(max_val):
@@ -53,6 +54,54 @@ def removeWall(image):
     cropped = thresh[y:y + h, x:x + w] 
     return cropped
 
+def get_date(sentences):
+    for text in sentences:
+        match = re.search(r'\d{2}/\d{2}/\d{4}', text)
+        if match:
+            date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y")
+            return date
+
+# Assume exactly 1 start time & at most 1 end time
+def extract_start_end_times(all_times):
+    if len(all_times) == 2:
+        return all_times
+    if len(all_times) == 1:
+        # assume end time is start time + 1 hr
+        start_time = all_times[0]        
+        start_time_of_day = start_time[-2:]
+        start_time = start_time.split('AM')[0]
+        start_time = start_time.split('PM')[0]
+        start_hour = start_time.split(':')[0]
+        start_minute = ""
+        if len(start_time.split(':')) == 2:
+            start_minute = start_time.split(':')[1]
+        if start_hour == '12':
+            end_hour = '1'
+        else:
+            end_hour = str(int(start_hour) + 1)
+
+        end_time_of_day = start_time_of_day
+        if start_hour == '11': 
+            if start_time_of_day == "AM":
+                end_time_of_day = "PM"
+            else:
+                end_time_of_day = "AM"
+
+        # if a start minute exists 
+        end_time = ""
+        if start_minute:
+            end_time = end_hour + ":" + start_minute + end_time_of_day
+        else:
+            end_time = end_hour + end_time_of_day
+        return [all_times[0], end_time]
+
+def get_times(sentences):
+    all_times = ""
+    for text in sentences:
+        all_times = re.findall(r'\d{1,2}(?:(?:AM|PM)|(?::\d{1,2})(?:AM|PM)?)', text)
+        if all_times:
+            return extract_start_end_times(all_times)
+
 # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def main():
     # currently work for title: noback2, salenoback 
@@ -69,16 +118,17 @@ def main():
     file.write("")
     file.close()
     possible_titles = {}
+    sentences = []
     j = 0
 
-    im2 = image.copy()   
     print(len(contours)) 
     for cnt in contours:
         # Source: https://stackoverflow.com/questions/24385714/detect-text-region-in-image-using-opencv 
         x, y, w, h = cv2.boundingRect(cnt)
-        cropped = inverse[y:y + h, x:x + w] # was thresh # was im2
+        cropped = inverse[y:y + h, x:x + w] # was thresh 
         file = open("recognized.txt", "a")
         text = pytesseract.image_to_string(cropped)
+        sentences.append(text)
 
         '''cv2.imshow('image', cropped)
         cv2.waitKey(0)
@@ -88,25 +138,24 @@ def main():
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
 
-        '''newtext = ""
-        for i in range(1, len(text)):
-            if text[i] == '\n' and text[i - 1] == '\n':
-                newtext += " "
-            else:
-                newtext += text[i]
-        regions = re.split("\n{2}", text)
-        print(regions)'''        
-        # then split string by whitespace, get rid of duplicates?
-        # actually: just look for date and time, once found, stop searching
-        
         file.write(text)
         file.write("\n")        
         file.close()   
     
+    # Get title
     # title is sentence with max height
     max_val = max(possible_titles.values(), key=lambda sub: sub[0])[1]
     new_title = clean_title(max_val)
-    print(new_title)    
+
+    clean_sentences = []
+    for ele in sentences:
+        clean_sentences.append(ele.replace("\n", ' '))
+
+    # Get date
+    date = get_date(clean_sentences)
+
+    # Get time
+    time = get_times(clean_sentences)
 
 
 main()
