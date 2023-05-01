@@ -9,6 +9,7 @@ import pytesseract
 from pytesseract import Output
 import re
 from datetime import datetime
+from imutils.perspective import four_point_transform
 
 
 def clean_title(max_val):
@@ -37,22 +38,12 @@ def get_sentence_info(cropped):
             words[i] = d['text'][i]
         (x, y, w, h) = (d['left'][i], d['top'][i], d['width'][i], d['height'][i])
         cv2.rectangle(cropped, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    avg_word_height = sum (word_heights.values()) / len(word_heights)
-    sentence = ' '.join(words.values())
-    return (avg_word_height, sentence)
-
-
-def removeWall(image):
-    # assumes dark wall
-    # works for: templateshapes, templatesale and 2, template_3_bad!!!, withbackground...
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(gray, 100, 255, cv2.THRESH_BINARY)
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
-                                             cv2.CHAIN_APPROX_NONE)
-    x, y, w, h = cv2.boundingRect(contours[0])
-    rect = cv2.rectangle(thresh, (x, y), (x + w, y + h), (255, 255, 255), 2)        
-    cropped = thresh[y:y + h, x:x + w] 
-    return cropped
+    if word_heights:
+        avg_word_height = sum(word_heights.values()) / len(word_heights)
+        sentence = ' '.join(words.values())
+        return (avg_word_height, sentence)
+    else:
+        return (0, "") # no text in file
 
 def get_date(sentences):
     for text in sentences:
@@ -102,21 +93,32 @@ def get_times(sentences):
         if all_times:
             return extract_start_end_times(all_times)
 
+def removeWall(image):
+    # assumes dark wall
+    # works for: templateshapes, templatesale and 2, template_3_bad!!!, withbackground...
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (3,3), 0)
+    ret, thresh = cv2.threshold(blur, 130, 255, cv2.THRESH_BINARY)
+    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL,
+                                             cv2.CHAIN_APPROX_NONE)
+    big_contour = max(contours, key = cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(big_contour)
+    cropped = thresh[y + 50:y -50 + h, x + 100:x -100 + w] 
+    return cropped
+
 # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def main():
     # currently work for title: noback2, salenoback 
-    image = cv2.imread('images/templatesale4.jpg')
+    # working in test: opening, opening2, sale, autumn (not party)
+    image = cv2.imread('test/autumn.jpg')
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
-    ksize = 50
+    ksize = 100
     rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (ksize, ksize))
     dilation = cv2.dilate(inverse, rect_kernel, iterations = 1)    
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
 
-    file = open("recognized.txt", "w+")
-    file.write("")
-    file.close()
     possible_titles = {}
     sentences = []
     j = 0
@@ -126,21 +128,17 @@ def main():
         # Source: https://stackoverflow.com/questions/24385714/detect-text-region-in-image-using-opencv 
         x, y, w, h = cv2.boundingRect(cnt)
         cropped = inverse[y:y + h, x:x + w] # was thresh 
-        file = open("recognized.txt", "a")
-        text = pytesseract.image_to_string(cropped)
+        text = pytesseract.image_to_string(cropped)#, config='--psm 6')
         sentences.append(text)
-
-        '''cv2.imshow('image', cropped)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()'''
 
         # Get title    
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
 
-        file.write(text)
-        file.write("\n")        
-        file.close()   
+        '''cv2.imshow('image', cropped)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()'''
+
     
     # Get title
     # title is sentence with max height
@@ -156,6 +154,9 @@ def main():
 
     # Get time
     time = get_times(clean_sentences)
+
+    print(new_title, date, time)
+
 
 
 main()
