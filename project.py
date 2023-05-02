@@ -52,49 +52,33 @@ def get_date(sentences):
             date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y")
             return date
 
-# Assume exactly 1 start time & at most 1 end time
-'''def extract_start_end_times(all_times):
-    if len(all_times) == 2:
-        return all_times
-    if len(all_times) == 1:
-        # assume end time is start time + 1 hr
-        start_time = all_times[0]        
-        start_time_of_day = start_time[-2:]
-        start_time = start_time.split('AM')[0]
-        start_time = start_time.split('PM')[0]
-        start_hour = start_time.split(':')[0]
-        start_minute = ""
-        if len(start_time.split(':')) == 2:
-            start_minute = start_time.split(':')[1]
-        if start_hour == '12':
-            end_hour = '1'
-        else:
-            end_hour = str(int(start_hour) + 1)
+# Adds space between number and time of day
+# Adds ":00" if no minutes
+def reformat_times(times):
+    # times has at most 2 elements
+    reformatted = []
+    for time in times:
+        # extract the number
+        t = time.replace("AM", '')
+        t = t.replace("PM", '')
 
-        end_time_of_day = start_time_of_day
-        if start_hour == '11': 
-            if start_time_of_day == "AM":
-                end_time_of_day = "PM"
-            else:
-                end_time_of_day = "AM"
-
-        # if a start minute exists 
-        end_time = ""
-        if start_minute:
-            end_time = end_hour + ":" + start_minute + end_time_of_day
-        else:
-            end_time = end_hour + end_time_of_day
-        return [all_times[0], end_time]'''
+        t += ":00 " if ':' not in t else " "
+        t += time[-2:]
+        reformatted.append(t)
+    return reformatted
 
 # Source: https://stackoverflow.com/questions/20437207/using-python-regular-expression-to-match-times
 def get_times(sentences):
-    all_times = ""
+    times = []
     for text in sentences:
-        all_times = re.findall(r'\d{1,2}(?:(?:AM|PM)|(?::\d{1,2})(?:AM|PM)?)', text)
-        if all_times:
-            #return extract_start_end_times(all_times)
-            # in case errors w pytesseract occur, return at most 2 times!!
-            return all_times
+        text_times = re.findall(r'\d{1,2}(?:(?:AM|PM)|(?::\d{1,2})(?:AM|PM)?)', text)
+        if text_times: 
+            # prevent duplicate times
+            [times.append(x) for x in text_times if x not in times]    
+
+    # in case errors w pytesseract occur, use at most first 2 times
+    reformatted_times = reformat_times(times[0:2])
+    return reformatted_times
 
 def removeWall(image):
     # assumes dark wall
@@ -150,7 +134,7 @@ def create_calendar_event(title, date, time):
 def main():
     # currently work for title: noback2, salenoback 
     # working in test: opening, opening2, sale, autumn (not party)
-    image = cv2.imread('test/sale.jpg')
+    image = cv2.imread('test/autumn.jpg')
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
     ksize = 100
