@@ -12,8 +12,8 @@ from datetime import datetime
 from imutils.perspective import four_point_transform
 
 
-def clean_title(max_val):
-    title_words = max_val.split()
+def clean_title(title):
+    title_words = title.split()
     cleaned_title = []
     for word in title_words:
         hasNums = False
@@ -136,11 +136,36 @@ def create_calendar_event(title, date, time):
             writer.writerow(headers)
             writer.writerow(content)
 
-# Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
+# sometimes titles are too big for our kernel
+# so add sentences to new_title that are within 10 pixels of max height
+def get_title(possible_titles):
+    # title: sentence with max height
+    if possible_titles:
+        max_value = max(possible_titles.values(), key=lambda sub: sub[0])
+        max_height = max_value[0]
+        reversed_titles = dict(reversed(list(possible_titles.items())))
+        large = []
+        for key in reversed_titles:
+            val = possible_titles[key]
+            h = val[0]
+            if ((max_height - 11) < h) and ((max_height + 11) > h):
+                large.append(val[1])
+
+        new_title = ' '.join(large)
+        return clean_title(new_title)
+    return ""
+
 def main():
+    files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
+             "test/opening.jpg", "test/opening2.jpg"]
+    for f in files:
+        process(f)
+
+# Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
+def process(file):
     # currently work for title: noback2, salenoback 
     # working in test: opening, opening2, sale, autumn (not party)
-    image = cv2.imread('test/sale.jpg')
+    image = cv2.imread(file)
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
     ksize = 100
@@ -149,56 +174,39 @@ def main():
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
     
-    cv2.imshow('image', croppedImage)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
     possible_titles = {}
     sentences = []
     j = 0
 
-    print(len(contours)) 
+    #print(len(contours)) 
     for cnt in contours:
         # Source: https://stackoverflow.com/questions/24385714/detect-text-region-in-image-using-opencv 
         x, y, w, h = cv2.boundingRect(cnt)
         cropped = inverse[y:y + h, x:x + w] # was thresh 
         text = pytesseract.image_to_string(cropped)#, config='--psm 6')
         sentences.append(text)
-
         # Get title    
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
-
         '''cv2.imshow('image', cropped)
         cv2.waitKey(0)
         cv2.destroyAllWindows()'''
-
-    
-    # Get title
-    # title is sentence with max height
-    if possible_titles:
-        max_val = max(possible_titles.values(), key=lambda sub: sub[0])[1]
-        new_title = clean_title(max_val)
-    else: 
-        new_title = ""
 
     clean_sentences = []
     for ele in sentences:
         clean_sentences.append(ele.replace("\n", ' '))
 
-    # Get date
+    title = get_title(possible_titles)
     date = get_date(clean_sentences)
-
-    # Get time
     time = get_times(clean_sentences)
 
-    print(new_title, date, time)
+    print(title, date, time)
 
     # Check if required elements present
-    if check_bad_elements(new_title, date, time):
+    if check_bad_elements(title, date, time):
         print("Some required elements could not be found.")
         print("Failed to create calendar file.")
     else:
-        return create_calendar_event(new_title, date, time)
+        return create_calendar_event(title, date, time)
 
 main()
