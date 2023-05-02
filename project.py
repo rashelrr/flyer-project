@@ -53,7 +53,7 @@ def get_date(sentences):
             return date
 
 # Assume exactly 1 start time & at most 1 end time
-def extract_start_end_times(all_times):
+'''def extract_start_end_times(all_times):
     if len(all_times) == 2:
         return all_times
     if len(all_times) == 1:
@@ -84,14 +84,17 @@ def extract_start_end_times(all_times):
             end_time = end_hour + ":" + start_minute + end_time_of_day
         else:
             end_time = end_hour + end_time_of_day
-        return [all_times[0], end_time]
+        return [all_times[0], end_time]'''
 
+# Source: https://stackoverflow.com/questions/20437207/using-python-regular-expression-to-match-times
 def get_times(sentences):
     all_times = ""
     for text in sentences:
         all_times = re.findall(r'\d{1,2}(?:(?:AM|PM)|(?::\d{1,2})(?:AM|PM)?)', text)
         if all_times:
-            return extract_start_end_times(all_times)
+            #return extract_start_end_times(all_times)
+            # in case errors w pytesseract occur, return at most 2 times!!
+            return all_times
 
 def removeWall(image):
     # assumes dark wall
@@ -105,12 +108,49 @@ def removeWall(image):
     x, y, w, h = cv2.boundingRect(big_contour)
     cropped = thresh[y + 50:y -50 + h, x + 100:x -100 + w] 
     return cropped
+    '''
+    #cropped = thresh[y:y + h, x:x + w] 
+    newcropped = trim(cropped)
+    return newcropped'''
+
+# Source: https://stackoverflow.com/questions/13538748/crop-black-edges-with-opencv
+def trim(frame):
+    '''if 0 in cropped[:, 0]:
+        return trim(cropped[:, 1:])
+    else:
+        return cropped'''
+    if 0 in frame[:, 0]:
+        return trim(frame[:, 10:]) # check if leftmost row isn25% filled with black - if less, we're fine, else trim more
+    else:
+        return frame
+
+def check_bad_elements(title, date, time):
+    return (title is None or date is None or time is None
+        or title == "" or date == "" or time == [])
+
+def create_calendar_event(title, date, time):
+    with open('output.csv', 'w') as f:
+        writer = csv.writer(f)
+        start_time = time[0]
+
+        if len(time) == 1:
+            headers = ['Subject', 'Start date', 'Start time']
+            content = [title, date, start_time]
+            writer.writerow(headers)
+            writer.writerow(content)
+        
+        if len(time) == 2:
+            end_time = time[1]
+            headers = ['Subject', 'Start date', 'Start time', 'End time']
+            content = [title, date, start_time, end_time]
+            writer.writerow(headers)
+            writer.writerow(content)
 
 # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def main():
     # currently work for title: noback2, salenoback 
     # working in test: opening, opening2, sale, autumn (not party)
-    image = cv2.imread('test/autumn.jpg')
+    image = cv2.imread('test/sale.jpg')
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
     ksize = 100
@@ -118,7 +158,7 @@ def main():
     dilation = cv2.dilate(inverse, rect_kernel, iterations = 1)    
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
-
+    
     possible_titles = {}
     sentences = []
     j = 0
@@ -142,8 +182,11 @@ def main():
     
     # Get title
     # title is sentence with max height
-    max_val = max(possible_titles.values(), key=lambda sub: sub[0])[1]
-    new_title = clean_title(max_val)
+    if possible_titles:
+        max_val = max(possible_titles.values(), key=lambda sub: sub[0])[1]
+        new_title = clean_title(max_val)
+    else: 
+        new_title = ""
 
     clean_sentences = []
     for ele in sentences:
@@ -157,6 +200,11 @@ def main():
 
     print(new_title, date, time)
 
-
+    # Check if required elements present
+    if check_bad_elements(new_title, date, time):
+        print("Some required elements could not be found.")
+        print("Failed to create calendar file.")
+    else:
+        return create_calendar_event(new_title, date, time)
 
 main()
