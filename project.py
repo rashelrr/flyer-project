@@ -155,11 +155,19 @@ def get_title(possible_titles):
         return clean_title(new_title)
     return ""
 
+def fix_sentences(sentences):
+    lst = []
+    for ele in sentences:
+        lst.append(ele.replace("\n", ' '))
+    return lst
+
+
 def main():
     files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
              "test/opening.jpg", "test/opening2.jpg"]
     for f in files:
         process(f)
+
 
 # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def process(file):
@@ -192,10 +200,7 @@ def process(file):
         cv2.waitKey(0)
         cv2.destroyAllWindows()'''
 
-    clean_sentences = []
-    for ele in sentences:
-        clean_sentences.append(ele.replace("\n", ' '))
-
+    clean_sentences = fix_sentences(sentences)
     title = get_title(possible_titles)
     date = get_date(clean_sentences)
     time = get_times(clean_sentences)
