@@ -90,21 +90,27 @@ def removeWall(image):
                                              cv2.CHAIN_APPROX_NONE)
     big_contour = max(contours, key = cv2.contourArea)
     x, y, w, h = cv2.boundingRect(big_contour)
-    cropped = thresh[y + 50:y -50 + h, x + 100:x -100 + w] 
-    return cropped
-    '''
-    #cropped = thresh[y:y + h, x:x + w] 
-    newcropped = trim(cropped)
-    return newcropped'''
+
+    cropped = thresh[y:y + h, x:x + w] 
+    trim = trimLR(cropped, cropped.shape[0], None) 
+    final_trim = trimUD(trim, None, trim.shape[1]) 
+    return final_trim
 
 # Source: https://stackoverflow.com/questions/13538748/crop-black-edges-with-opencv
-def trim(frame):
-    '''if 0 in cropped[:, 0]:
-        return trim(cropped[:, 1:])
+# if more than 25% black, crop side
+def trimLR(frame, rows, cols):
+    if np.count_nonzero(frame[:, 0] == 0) > (rows * 0.25): 
+        return trimLR(frame[:, 10:], rows, cols) 
+    elif np.count_nonzero(frame[:,-1] == 0) > (rows * 0.25): 
+        return trimLR(frame[:,:-10], rows, cols) 
     else:
-        return cropped'''
-    if 0 in frame[:, 0]:
-        return trim(frame[:, 10:]) # check if leftmost row isn25% filled with black - if less, we're fine, else trim more
+        return frame
+
+def trimUD(frame, rows, cols):
+    if np.count_nonzero(frame[0] == 0) > (cols * 0.25):  
+        return trimUD(frame[10:], rows, cols) 
+    if np.count_nonzero(frame[-1] == 0) > (cols * 0.25):  
+        return trimUD(frame[:-10], rows, cols) 
     else:
         return frame
 
@@ -134,7 +140,7 @@ def create_calendar_event(title, date, time):
 def main():
     # currently work for title: noback2, salenoback 
     # working in test: opening, opening2, sale, autumn (not party)
-    image = cv2.imread('test/autumn.jpg')
+    image = cv2.imread('test/sale.jpg')
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
     ksize = 100
@@ -143,6 +149,10 @@ def main():
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
     
+    cv2.imshow('image', croppedImage)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
     possible_titles = {}
     sentences = []
     j = 0
