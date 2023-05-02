@@ -36,8 +36,6 @@ def get_sentence_info(cropped):
         if d['text'][i] != '':
             word_heights[i] = d['height'][i]
             words[i] = d['text'][i]
-        (x, y, w, h) = (d['left'][i], d['top'][i], d['width'][i], d['height'][i])
-        cv2.rectangle(cropped, (x, y), (x + w, y + h), (0, 255, 0), 2)
     if word_heights:
         avg_word_height = sum(word_heights.values()) / len(word_heights)
         sentence = ' '.join(words.values())
@@ -155,10 +153,11 @@ def get_title(possible_titles):
         return clean_title(new_title)
     return ""
 
-def fix_sentences(sentences):
+def cleanup_sentences(sentences):
     lst = []
     for ele in sentences:
-        lst.append(ele.replace("\n", ' '))
+        if ele != '':
+            lst.append(ele.replace("\n", ' '))
     return lst
 
 
@@ -181,7 +180,6 @@ def process(file):
     dilation = cv2.dilate(inverse, rect_kernel, iterations = 1)    
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
                                              cv2.CHAIN_APPROX_NONE)
-    
     possible_titles = {}
     sentences = []
     j = 0
@@ -200,7 +198,7 @@ def process(file):
         cv2.waitKey(0)
         cv2.destroyAllWindows()'''
 
-    clean_sentences = fix_sentences(sentences)
+    clean_sentences = cleanup_sentences(sentences)
     title = get_title(possible_titles)
     date = get_date(clean_sentences)
     time = get_times(clean_sentences)
