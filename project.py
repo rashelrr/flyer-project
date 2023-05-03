@@ -48,16 +48,16 @@ def is_date_valid(date):
     mm, dd, year = date.split("/")
     mm, dd, year = int(mm), int(dd), int(year)
     return ((mm in range(1, 13)) and (dd in range(1, 32)) and 
-            year in range(2023, 2026))
+            year in range(23, 26))
 
 def get_date(sentences):
     for text in sentences:
-        match = re.search(r'\d{2}/\d{2}/\d{4}', text)
+        match = re.search(r'\d{2}/\d{2}/\d{2}', text)
         if match:
             # check within range
             validDate = is_date_valid(match.group())
             if validDate:
-                date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y") # change to y later
+                date = datetime.strptime(match.group(), '%m/%d/%y').strftime("%m/%d/%y") # change to y later
                 return date
             return None
 
@@ -254,7 +254,7 @@ def fix_ocr(sentences):
         # fix possible date: assume only 1 word in flyer fits this criteria 
         # since hard to confuse for other non-date strings
         for i, word in enumerate(words):
-            if len(word) == 10 and num_there(word):
+            if len(word) == 8 and num_there(word):
                 words[i] = fix_date(word, respell, special_respell)   
                 break
         # fix possible times: assume time ends with am/pm
@@ -271,7 +271,7 @@ def main():
     files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
              "test/green.jpg", "test/opening.jpg", "test/opening2.jpg"]
     files = ["test/green_baddatetime.jpg", "test/green_badtime.jpg"]
-    files = ["test/salenoback (2).jpg"]
+    files = ["test/smalleryear.jpg"]
     for f in files:
         process(f)
 
