@@ -47,7 +47,7 @@ def get_date(sentences):
     for text in sentences:
         match = re.search(r'\d{2}/\d{2}/\d{4}', text)
         if match:
-            date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y")
+            date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y") # change to y later
             return date
 
 # Adds space between number and time of day
@@ -161,12 +161,101 @@ def cleanup_sentences(sentences):
     return lst
 
 
+# https://stackoverflow.com/questions/19859282/check-if-a-string-contains-a-number
+def num_there(s):
+    return any(i.isdigit() for i in s)
+
+def fix_date(date, respell, special_respell):
+    date = date.replace("|", "/")
+    if date.count("/") != 2: # can't do what's below
+        return date
+
+    # fix numbers
+    lst_date = list(date)
+    for i, char in enumerate(lst_date):
+        if char in respell:
+            lst_date[i] = respell[char]
+
+    new_date = ''.join(lst_date)
+
+    # special cases: ranges
+    nums = new_date.split("/")
+    mm, dd, year = nums[0], nums[1], nums[2]
+
+    if mm == "17":
+        mm = mm.replace('7', special_respell['7'])
+    if dd == "37":
+        dd = dd.replace('7', special_respell['7'])
+    elif dd == "80" or dd == "81":
+        dd = dd.replace('8', special_respell['8'])
+    if year[-1] == '8':
+        year = year[:3] + special_respell['8']
+    
+    fixed_date = mm + "/" + dd + "/" + year
+
+    return fixed_date
+
+def fix_time(time, respell, special_respell):
+    nums = time[:-2]
+    am_pm = time[-2:]
+
+    # fix numbers
+    lst_nums = list(nums)
+    for i, char in enumerate(lst_nums):
+        if char in respell:
+            lst_nums[i] = respell[char]
+
+    new_nums = ''.join(lst_nums)
+
+    # special cases
+    new_nums = new_nums.replace(".", ":")
+
+    numbers = new_nums.split(":")
+    if len(numbers) == 2: # means minutes present
+        hour = numbers[0]
+        minute = numbers[1]
+        for key in special_respell:
+            if minute[0] == key:
+                minute = special_respell[key] + minute[1]
+        new_nums = hour + ":" + minute
+    
+    new_nums += am_pm
+    return new_nums
+
+def fix_ocr(sentences):
+    # sentences: list of strings
+    respell = {'A': '4', 'B': '3', 'b': '6', 'D': '0', 'E': '3', 'F': '7', 
+               'G': '6', 'g': '9', 'H': '4', 'I': '1', 'i': '1', 'L': '1', 
+               'l': '1', 'O': '0', 'q': '9', 'S': '5', 'T': '7', 'U': '0', 
+               'Z': '2'}
+    special_respell = {'7': '1', '8': '3'}
+
+    # fix possible dates
+    for idx, sentence in enumerate(sentences):
+        words = sentence.split()
+        # fix possible date
+        for i, word in enumerate(words):
+            if len(word) == 10 and num_there(word) and '|' in word:
+                words[i] = fix_date(word, respell, special_respell)   
+                break
+        
+        # fix possible times
+        for i, word in enumerate(words):
+            if (len(word) <= 7 and len(word) >= 3 and 
+                (word[-2:] == "AM" or word[-2:] == "PM")):
+                words[i] = fix_time(word, respell, special_respell)
+        # rejoin words
+        new_sentence = ' '.join(words) 
+        sentences[idx] = new_sentence
+
+    return sentences
+
 def main():
     files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
-             "test/opening.jpg", "test/opening2.jpg"]
+             "test/opening.jpg", "test/opening2.jpg", "test/bad_date.jpg",
+             "test/green3.jpg"]
     for f in files:
         process(f)
-
 
 # Source: https://www.geeksforgeeks.org/text-detection-and-extraction-using-opencv-and-ocr/
 def process(file):
@@ -175,7 +264,7 @@ def process(file):
     image = cv2.imread(file)
     croppedImage = removeWall(image)
     inverse = cv2.bitwise_not(croppedImage)
-    ksize = 100
+    ksize = 100 
     rect_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (ksize, ksize))
     dilation = cv2.dilate(inverse, rect_kernel, iterations = 1)    
     contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL,
@@ -194,14 +283,15 @@ def process(file):
         # Get title    
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
-        '''cv2.imshow('image', cropped)
+        cv2.imshow('image', cropped)
         cv2.waitKey(0)
-        cv2.destroyAllWindows()'''
+        cv2.destroyAllWindows()
 
     clean_sentences = cleanup_sentences(sentences)
+    fixed_sentences = fix_ocr(clean_sentences)
     title = get_title(possible_titles)
-    date = get_date(clean_sentences)
-    time = get_times(clean_sentences)
+    date = get_date(fixed_sentences) 
+    time = get_times(fixed_sentences) 
 
     print(title, date, time)
 
