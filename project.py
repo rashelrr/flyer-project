@@ -43,17 +43,27 @@ def get_sentence_info(cropped):
     else:
         return (0, "") # no text in file
 
+def is_date_valid(date):
+    # can assume in format nn/nn/nnnn (n=num)
+    mm, dd, year = date.split("/")
+    mm, dd, year = int(mm), int(dd), int(year)
+    return ((mm in range(1, 13)) and (dd in range(1, 32)) and 
+            year in range(2023, 2026))
+
 def get_date(sentences):
     for text in sentences:
         match = re.search(r'\d{2}/\d{2}/\d{4}', text)
         if match:
-            date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y") # change to y later
-            return date
+            # check within range
+            validDate = is_date_valid(match.group())
+            if validDate:
+                date = datetime.strptime(match.group(), '%m/%d/%Y').strftime("%m/%d/%Y") # change to y later
+                return date
+            return None
 
 # Adds space between number and time of day
 # Adds ":00" if no minutes
 def reformat_times(times):
-    # times has at most 2 elements
     reformatted = []
     for time in times:
         # extract the number
@@ -65,6 +75,14 @@ def reformat_times(times):
         reformatted.append(t)
     return reformatted
 
+def is_time_valid(time):
+    # can assume in format n:nn or nn:nn, plus AM/PM (n=num)
+    nums = time[:-2]
+    x = nums.split(":")
+    hour, minute = int(x[0]), int(x[1])
+
+    return ((hour in range(1, 13)) and (minute in range(0, 60)))
+
 # Source: https://stackoverflow.com/questions/20437207/using-python-regular-expression-to-match-times
 def get_times(sentences):
     times = []
@@ -74,9 +92,15 @@ def get_times(sentences):
             # prevent duplicate times
             [times.append(x) for x in text_times if x not in times]    
 
+    reformatted_times = reformat_times(times)
+
+    valid_times = []
+    for time in reformatted_times:
+        if is_time_valid(time):
+            valid_times.append(time)
+
     # in case errors w pytesseract occur, use at most first 2 times
-    reformatted_times = reformat_times(times[0:2])
-    return reformatted_times
+    return valid_times[:2]
 
 def removeWall(image):
     # assumes dark wall
@@ -160,7 +184,6 @@ def cleanup_sentences(sentences):
             lst.append(ele.replace("\n", ' '))
     return lst
 
-
 # https://stackoverflow.com/questions/19859282/check-if-a-string-contains-a-number
 def num_there(s):
     return any(i.isdigit() for i in s)
@@ -175,13 +198,11 @@ def fix_date(date, respell, special_respell):
     for i, char in enumerate(lst_date):
         if char in respell:
             lst_date[i] = respell[char]
-
     new_date = ''.join(lst_date)
 
     # special cases: ranges
     nums = new_date.split("/")
     mm, dd, year = nums[0], nums[1], nums[2]
-
     if mm == "17":
         mm = mm.replace('7', special_respell['7'])
     if dd == "37":
@@ -190,9 +211,7 @@ def fix_date(date, respell, special_respell):
         dd = dd.replace('8', special_respell['8'])
     if year[-1] == '8':
         year = year[:3] + special_respell['8']
-    
     fixed_date = mm + "/" + dd + "/" + year
-
     return fixed_date
 
 def fix_time(time, respell, special_respell):
@@ -204,7 +223,6 @@ def fix_time(time, respell, special_respell):
     for i, char in enumerate(lst_nums):
         if char in respell:
             lst_nums[i] = respell[char]
-
     new_nums = ''.join(lst_nums)
 
     # special cases
@@ -218,7 +236,7 @@ def fix_time(time, respell, special_respell):
             if minute[0] == key:
                 minute = special_respell[key] + minute[1]
         new_nums = hour + ":" + minute
-    
+
     new_nums += am_pm
     return new_nums
 
@@ -233,13 +251,13 @@ def fix_ocr(sentences):
     # fix possible dates
     for idx, sentence in enumerate(sentences):
         words = sentence.split()
-        # fix possible date
+        # fix possible date: assume only 1 word in flyer fits this criteria 
+        # since hard to confuse for other non-date strings
         for i, word in enumerate(words):
-            if len(word) == 10 and num_there(word) and '|' in word:
+            if len(word) == 10 and num_there(word):
                 words[i] = fix_date(word, respell, special_respell)   
                 break
-        
-        # fix possible times
+        # fix possible times: assume time ends with am/pm
         for i, word in enumerate(words):
             if (len(word) <= 7 and len(word) >= 3 and 
                 (word[-2:] == "AM" or word[-2:] == "PM")):
@@ -247,13 +265,13 @@ def fix_ocr(sentences):
         # rejoin words
         new_sentence = ' '.join(words) 
         sentences[idx] = new_sentence
-
     return sentences
 
 def main():
     files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
-             "test/opening.jpg", "test/opening2.jpg", "test/bad_date.jpg",
-             "test/green3.jpg"]
+             "test/green.jpg", "test/opening.jpg", "test/opening2.jpg"]
+    files = ["test/green_baddatetime.jpg", "test/green_badtime.jpg"]
+    files = ["test/salenoback (2).jpg"]
     for f in files:
         process(f)
 
@@ -283,9 +301,9 @@ def process(file):
         # Get title    
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
-        cv2.imshow('image', cropped)
+        '''cv2.imshow('image', cropped)
         cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        cv2.destroyAllWindows()'''
 
     clean_sentences = cleanup_sentences(sentences)
     fixed_sentences = fix_ocr(clean_sentences)
