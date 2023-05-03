@@ -67,8 +67,9 @@ def reformat_times(times):
     reformatted = []
     for time in times:
         # extract the number
-        t = time.replace("AM", '')
-        t = t.replace("PM", '')
+        time = time.lower()
+        t = time.replace("am", '')
+        t = t.replace("pm", '')
 
         t += ":00 " if ':' not in t else " "
         t += time[-2:]
@@ -76,7 +77,7 @@ def reformat_times(times):
     return reformatted
 
 def is_time_valid(time):
-    # can assume in format n:nn or nn:nn, plus AM/PM (n=num)
+    # can assume in format n:nn or nn:nn, plus am/pm (n=num)
     nums = time[:-2]
     x = nums.split(":")
     hour, minute = int(x[0]), int(x[1])
@@ -87,7 +88,7 @@ def is_time_valid(time):
 def get_times(sentences):
     times = []
     for text in sentences:
-        text_times = re.findall(r'\d{1,2}(?:(?:AM|PM)|(?::\d{1,2})(?:AM|PM)?)', text)
+        text_times = re.findall(r'\d{1,2}(?:(?:am|pm)|(?::\d{1,2})(?:am|pm)?)', text.lower())
         if text_times: 
             # prevent duplicate times
             [times.append(x) for x in text_times if x not in times]    
@@ -260,7 +261,7 @@ def fix_ocr(sentences):
         # fix possible times: assume time ends with am/pm
         for i, word in enumerate(words):
             if (len(word) <= 7 and len(word) >= 3 and 
-                (word[-2:] == "AM" or word[-2:] == "PM")):
+                (word[-2:].lower() == "am" or word[-2:].lower() == "pm")):
                 words[i] = fix_time(word, respell, special_respell)
         # rejoin words
         new_sentence = ' '.join(words) 
@@ -271,7 +272,7 @@ def main():
     files = ["test/autumn.jpg", "test/party.jpg", "test/sale.jpg", 
              "test/green.jpg", "test/opening.jpg", "test/opening2.jpg"]
     files = ["test/green_baddatetime.jpg", "test/green_badtime.jpg"]
-    files = ["test/smalleryear.jpg"]
+    files = ["test/am_pm.jpg"]
     for f in files:
         process(f)
 
