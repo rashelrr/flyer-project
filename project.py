@@ -208,7 +208,8 @@ def num_there(s):
 
 # Returns modified date by fixing any pytesseract errors
 def fix_date(date, respell, special_respell):
-    date = date.replace("|", "\\")
+    date = date.replace("|", "/")
+    date = date.replace("\\", "/")
     if date.count("/") != 2: # can't do what's below
         return date
 
@@ -229,7 +230,7 @@ def fix_date(date, respell, special_respell):
     elif dd == "80" or dd == "81":
         dd = dd.replace('8', special_respell['8'])
     if year[-1] == '8':
-        year = year[:3] + special_respell['8']
+        year = year[:1] + special_respell['8']
     fixed_date = mm + "/" + dd + "/" + year
     return fixed_date
 
@@ -274,7 +275,7 @@ def fix_ocr(sentences):
         # fix possible date: assume only 1 word in flyer fits this criteria 
         # since hard to confuse for other non-date strings
         for i, word in enumerate(words):
-            if len(word) == 8 and num_there(word):
+            if len(word) >= 8 and len(word) <= 11 and num_there(word):
                 words[i] = fix_date(word, respell, special_respell)   
                 break
         # fix possible times: assume time ends with am/pm
@@ -337,7 +338,7 @@ def process(file):
 # Returns image files
 def get_files(file_type):
     files = []
-    path = "black/"
+    path = "test/"
     dir_list = os.listdir(path)
     for fn in dir_list:
         if fn.endswith(file_type):
