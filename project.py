@@ -66,7 +66,7 @@ def get_date(sentences):
                 date = datetime.strptime(match.group(), '%m/%d/%y')
                 date = date.strftime("%m/%d/%y") 
                 return date
-            return None
+    return None
 
 # Returns times in format required for csv file
 def reformat_times(times):
@@ -208,7 +208,7 @@ def num_there(s):
 
 # Returns modified date by fixing any pytesseract errors
 def fix_date(date, respell, special_respell):
-    date = date.replace("|", "/")
+    date = date.replace("|", "\\")
     if date.count("/") != 2: # can't do what's below
         return date
 
@@ -313,7 +313,6 @@ def process(file):
         cropped = inverse[y:y + h, x:x + w] 
         text = pytesseract.image_to_string(cropped)
         sentences.append(text)
-        # Get title    
         possible_titles[j] = get_sentence_info(cropped) 
         j += 1
         '''cv2.imshow('image', cropped)
